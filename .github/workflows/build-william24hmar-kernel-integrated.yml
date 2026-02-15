@@ -1,0 +1,172 @@
+name: Build William24hmar's Nothing Kernel (Integrated)
+
+on:
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      kernel_branch:
+        description: 'Kernel branch to build'
+        required: false
+        default: 'Cass-QPR2'
+        type: choice
+        options:
+          - 'Cass-QPR2'
+          - 'main'
+          - 'master'
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  # Device configuration
+  DEVICE_NAME: "nothing_phone_1"
+  DEVICE_CODENAME: "spacewar"
+  
+  # Build configuration
+  CUSTOM_CMDS: "CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu-"
+  EXTRA_CMDS: "LLVM=1 LLVM_IAS=1"
+  
+  # Kernel source
+  KERNEL_SOURCE: "https://github.com/William24hmar/android_kernel_nothing_sm7325.git"
+  KERNEL_BRANCH: "${{ github.event.inputs.kernel_branch || 'Cass-QPR2' }}"
+  
+  # Toolchain configuration
+  CLANG_SOURCE: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-r574158.tar.gz"
+  CLANG_BRANCH: ""
+  
+  GCC_GNU: false
+  GCC_64_SOURCE: "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9.git"
+  GCC_64_BRANCH: "android12L-release"
+  GCC_32_SOURCE: "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9.git"
+  GCC_32_BRANCH: "android12L-release"
+  
+  # Kernel configuration
+  DEFCONFIG_SOURCE: ""
+  DEFCONFIG_NAME: "vendor/lahaina-qgki_defconfig"
+  DEFCONFIG_ORIGIN_IMAGE: ""
+  DEFCONFIG_FROM_BOOT: false
+  
+  # KernelSU configuration (optional)
+  KERNELSU_SOURCE: ""
+  KERNELSU_BRANCH: ""
+  KERNELSU_AUTO_GET: "false"
+  KERNELSU_AUTO_FORK: ""
+  
+  # SuSFS configuration
+  SUSFS_ENABLE: false
+  SUSFS_FIXED: false
+  
+  # AnyKernel3 configuration
+  AK3_SOURCE: "https://github.com/osm0sis/AnyKernel3.git"
+  AK3_BRANCH: "master"
+  
+  BOOT_SOURCE: ""
+  NEED_DTBO: false
+  NEED_SAFE_DTBO: false
+  
+  # Build metadata
+  ROM_TEXT: "william24hmar_kernel"
+  
+  # Other options
+  PYTHON_VERSION: "3"
+  PACK_METHOD: "Anykernel3"
+  KERNELSU_METHOD: "shell"
+  
+  PATCHES_SOURCE: ""
+  PATCHES_BRANCH: ""
+  
+  SUSFS_FOLDER_FIXED: ""
+  SUSFS_PATCH_FIXED: ""
+  
+  REKERNEL_ENABLE: "false"
+  HOOK_METHOD: "syscall"
+  HOOK_OLDER: "false"
+  KERNEL_PATCH: "false"
+  
+  KPM_ENABLE: "false"
+  KPM_INLINE: "false"
+  KPM_KPATCH_NEXT: "false"
+  KPM_PATCH_SOURCE: ""
+  
+  BASEBAND_GUARD_ENABLE: "false"
+  BASEBAND_GUARD_BOOT: "false"
+  
+  HIDE_STUFF: "false"
+  GENERATE_DTB: "true"
+  GENERATE_CHIP: "qcom"
+  
+  BUILD_DEBUGGER: "false"
+  SKIP_PATCH: "false"
+  
+  BUILD_OTHER_CONFIG: "false"
+  MERGE_CONFIG_FILES: ""
+  
+  FREE_MORE_SPACE: "false"
+
+jobs:
+  build-kernel:
+    name: William24hmar's Nothing Kernel (Integrated)
+    runs-on: ubuntu-latest
+    env:
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_HARDLINK: "true"
+
+    steps:
+      - name: ⏰ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⌛️ Compilation environment preparation
+        uses: ./.github/workflows/build-env
+
+      - name: ⚙️ Get necessary tools
+        uses: ./.github/workflows/build-ready
+
+      - name: 📥 Clone kernel source
+        run: |
+          echo "Cloning kernel source from: ${{ env.KERNEL_SOURCE }}"
+          git clone --depth=1 -b ${{ env.KERNEL_BRANCH }} ${{ env.KERNEL_SOURCE }} device_kernel || \
+          git clone -b ${{ env.KERNEL_BRANCH }} ${{ env.KERNEL_SOURCE }} device_kernel
+          
+          cd device_kernel
+          echo "Kernel branch: $(git rev-parse --abbrev-ref HEAD)"
+          echo "Kernel commit: $(git rev-parse --short HEAD)"
+
+      - name: 🪝 Patch Kernel of SUSFS
+        uses: ./.github/workflows/patch-susfs
+        if: env.SUSFS_ENABLE == 'true'
+
+      - name: 🔗 Patch for no-kprobe
+        uses: ./.github/workflows/patch-no-kprobe
+
+      - name: 🧰 Patch Kernel of Re:Kernel
+        uses: ./.github/workflows/patch-rekernel
+        if: env.REKERNEL_ENABLE == 'true'
+
+      - name: 🔒 Patch Kernel of Baseband Guard
+        uses: ./.github/workflows/patch-baseband-guard
+        if: env.BASEBAND_GUARD_ENABLE == 'true'
+
+      - name: 🔧 Patch Hide Stuff
+        uses: ./.github/workflows/patch-hide-stuff
+        if: env.HIDE_STUFF == 'true'
+
+      - name: 🚀 Build Process
+        uses: ./.github/workflows/build-process
+
+      - name: 🔩 Pack Process
+        uses: ./.github/workflows/pack-process
+
+      - name: ✏️ Upload Artifacts
+        uses: ./.github/workflows/upload-files
+
+      - name: ✅ Build Complete
+        run: |
+          echo "=========================================="
+          echo "Build Complete!"
+          echo "=========================================="
+          echo "Device: ${{ env.DEVICE_NAME }}"
+          echo "Kernel Branch: ${{ env.KERNEL_BRANCH }}"
+          echo "Build Date: $(date)"
+          echo "=========================================="

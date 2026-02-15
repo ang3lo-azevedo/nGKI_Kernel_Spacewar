@@ -1,0 +1,395 @@
+name: Build William24hmar's Nothing Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_branch:
+        description: 'Kernel branch to build'
+        required: false
+        default: 'Cass-QPR2'
+        type: choice
+        options:
+          - 'Cass-QPR2'
+          - 'main'
+          - 'master'
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  # Device configuration
+  DEVICE_NAME: "nothing_phone_1"
+  DEVICE_CODENAME: "spacewar"
+  
+  # Build configuration
+  CUSTOM_CMDS: "CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu-"
+  EXTRA_CMDS: "LLVM=1 LLVM_IAS=1"
+  
+  # Kernel source
+  KERNEL_SOURCE: "https://github.com/William24hmar/android_kernel_nothing_sm7325.git"
+  KERNEL_BRANCH: "${{ github.event.inputs.kernel_branch || 'Cass-QPR2' }}"
+  
+  # Toolchain configuration
+  CLANG_SOURCE: "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-r574158.tar.gz"
+  CLANG_BRANCH: ""
+  
+  GCC_GNU: false
+  GCC_64_SOURCE: "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9.git"
+  GCC_64_BRANCH: "android12L-release"
+  GCC_32_SOURCE: "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9.git"
+  GCC_32_BRANCH: "android12L-release"
+  
+  # Kernel configuration
+  DEFCONFIG_SOURCE: ""
+  DEFCONFIG_NAME: "vendor/lahaina-qgki_defconfig"
+  DEFCONFIG_ORIGIN_IMAGE: ""
+  DEFCONFIG_FROM_BOOT: false
+  
+  # KernelSU configuration (optional)
+  KERNELSU_SOURCE: ""
+  KERNELSU_BRANCH: ""
+  KERNELSU_AUTO_GET: "false"
+  KERNELSU_AUTO_FORK: ""
+  
+  # SuSFS configuration
+  SUSFS_ENABLE: false
+  SUSFS_FIXED: false
+  
+  # AnyKernel3 configuration
+  AK3_SOURCE: "https://github.com/osm0sis/AnyKernel3.git"
+  AK3_BRANCH: "master"
+  
+  BOOT_SOURCE: ""
+  NEED_DTBO: false
+  NEED_SAFE_DTBO: false
+  
+  # Build metadata
+  ROM_TEXT: "william24hmar_kernel"
+  
+  # Other options
+  PYTHON_VERSION: "3"
+  PACK_METHOD: "Anykernel3"
+  KERNELSU_METHOD: "shell"
+  
+  PATCHES_SOURCE: ""
+  PATCHES_BRANCH: ""
+  
+  SUSFS_FOLDER_FIXED: ""
+  SUSFS_PATCH_FIXED: ""
+  
+  REKERNEL_ENABLE: "false"
+  HOOK_METHOD: "syscall"
+  HOOK_OLDER: "false"
+  KERNEL_PATCH: "false"
+  
+  KPM_ENABLE: "false"
+  KPM_INLINE: "false"
+  KPM_KPATCH_NEXT: "false"
+  KPM_PATCH_SOURCE: ""
+  
+  BASEBAND_GUARD_ENABLE: "false"
+  BASEBAND_GUARD_BOOT: "false"
+  
+  HIDE_STUFF: "false"
+  GENERATE_DTB: "true"
+  GENERATE_CHIP: "qcom"
+  
+  BUILD_DEBUGGER: "false"
+  SKIP_PATCH: "false"
+  
+  BUILD_OTHER_CONFIG: "false"
+  MERGE_CONFIG_FILES: ""
+  
+  FREE_MORE_SPACE: "false"
+
+jobs:
+  build-kernel:
+    name: Build William24hmar's Nothing Kernel
+    runs-on: ubuntu-latest
+    env:
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_HARDLINK: "true"
+
+    steps:
+      - name: ⏰ Checkout this repository
+        uses: actions/checkout@v4
+        with:
+          path: build-system
+
+      - name: Check out kernel source
+        run: |
+          git clone --depth=1 -b ${{ env.KERNEL_BRANCH }} ${{ env.KERNEL_SOURCE }} device_kernel || \
+          git clone -b ${{ env.KERNEL_BRANCH }} ${{ env.KERNEL_SOURCE }} device_kernel
+
+      - name: Display directory structure
+        run: |
+          echo "=== Build System ==="
+          ls -la build-system/
+          echo ""
+          echo "=== Kernel Source ==="
+          ls -la device_kernel/
+
+      - name: 🔧 Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+              build-essential \
+              libncurses-dev \
+              bc \
+              bison \
+              flex \
+              libelf-dev \
+              libssl-dev \
+              git \
+              git-lfs \
+              curl \
+              ccache \
+              python3 \
+              python3-pip \
+              zip \
+              unzip
+
+      - name: ⬇️ Download CLANG toolchain
+        run: |
+          mkdir -p ${{ github.workspace }}/toolchain/clang
+          cd ${{ github.workspace }}/toolchain/clang
+          
+          echo "Downloading CLANG toolchain..."
+          curl -L "${{ env.CLANG_SOURCE }}" -o clang.tar.gz
+          tar -xzf clang.tar.gz
+          rm clang.tar.gz
+          
+          # Verify CLANG installation
+          ./bin/clang --version
+
+      - name: ⬇️ Download GCC 64-bit toolchain
+        run: |
+          mkdir -p ${{ github.workspace }}/toolchain/gcc-64
+          cd ${{ github.workspace }}/toolchain/gcc-64
+          
+          echo "Downloading GCC 64-bit toolchain..."
+          git clone --depth=1 -b ${{ env.GCC_64_BRANCH }} ${{ env.GCC_64_SOURCE }} .
+
+      - name: ⬇️ Download GCC 32-bit toolchain
+        run: |
+          mkdir -p ${{ github.workspace }}/toolchain/gcc-32
+          cd ${{ github.workspace }}/toolchain/gcc-32
+          
+          echo "Downloading GCC 32-bit toolchain..."
+          git clone --depth=1 -b ${{ env.GCC_32_BRANCH }} ${{ env.GCC_32_SOURCE }} .
+
+      - name: 🔍 Verify toolchain installation
+        run: |
+          echo "CLANG version:"
+          ${{ github.workspace }}/toolchain/clang/bin/clang --version
+          
+          echo "GCC 64-bit version:"
+          ${{ github.workspace }}/toolchain/gcc-64/bin/aarch64-linux-android-gcc --version || true
+
+      - name: ⚙️ Configure kernel
+        run: |
+          cd ${{ github.workspace }}/device_kernel
+          
+          # Set up environment
+          export PATH="${{ github.workspace }}/toolchain/clang/bin:$PATH"
+          export LD_LIBRARY_PATH="${{ github.workspace }}/toolchain/clang/lib64:$LD_LIBRARY_PATH"
+          
+          # Load defconfig
+          if [ -n "${{ env.DEFCONFIG_NAME }}" ]; then
+              echo "Loading defconfig: ${{ env.DEFCONFIG_NAME }}"
+              make ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} "${{ env.DEFCONFIG_NAME }}"
+          else
+              echo "Loading default defconfig"
+              make ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} defconfig
+          fi
+
+      - name: 🚀 Build kernel
+        run: |
+          cd ${{ github.workspace }}/device_kernel
+          
+          # Set up environment
+          export PATH="${{ github.workspace }}/toolchain/clang/bin:$PATH"
+          export LD_LIBRARY_PATH="${{ github.workspace }}/toolchain/clang/lib64:$LD_LIBRARY_PATH"
+          export ARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-android-
+          export CLANG_TRIPLE=aarch64-linux-gnu-
+          
+          # Build with multiple jobs
+          echo "Starting kernel build..."
+          make ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} -j$(nproc) 2>&1 | tee build.log
+          
+          if [ $? -ne 0 ]; then
+              echo "Build failed!"
+              tail -n 100 build.log
+              exit 1
+          fi
+          
+          # Check if Image exists
+          if [ -f arch/arm64/boot/Image ]; then
+              echo "✓ Kernel Image built successfully"
+          else
+              echo "✗ Failed to build kernel Image"
+              exit 1
+          fi
+
+      - name: 🔨 Build dtb (Device Tree Blob)
+        run: |
+          cd ${{ github.workspace }}/device_kernel
+          
+          export PATH="${{ github.workspace }}/toolchain/clang/bin:$PATH"
+          export LD_LIBRARY_PATH="${{ github.workspace }}/toolchain/clang/lib64:$LD_LIBRARY_PATH"
+          export ARCH=arm64
+          
+          if [ "${{ env.GENERATE_DTB }}" = "true" ]; then
+              echo "Building DTB..."
+              make ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} dtbs -j$(nproc)
+          fi
+
+      - name: 📦 Download AnyKernel3
+        run: |
+          mkdir -p ${{ github.workspace }}/AnyKernel3
+          cd ${{ github.workspace }}/AnyKernel3
+          
+          echo "Cloning AnyKernel3..."
+          git clone --depth=1 -b master ${{ env.AK3_SOURCE }} .
+
+      - name: 🔧 Prepare AnyKernel3
+        run: |
+          cd ${{ github.workspace }}/AnyKernel3
+          
+          # Copy kernel image
+          mkdir -p kernel
+          cp ${{ github.workspace }}/device_kernel/arch/arm64/boot/Image kernel/
+          
+          # Copy DTB files if they exist
+          if [ -f "${{ github.workspace }}/device_kernel/arch/arm64/boot/dts/qcom/lahaina.dtb" ]; then
+              mkdir -p kernel/dtb
+              cp ${{ github.workspace }}/device_kernel/arch/arm64/boot/dts/qcom/*.dtb kernel/dtb/
+          fi
+          
+          # Copy DTBO if needed
+          if [ -f "${{ github.workspace }}/device_kernel/arch/arm64/boot/dts/qcom/lahaina-dtbo.img" ]; then
+              cp ${{ github.workspace }}/device_kernel/arch/arm64/boot/dts/qcom/lahaina-dtbo.img dtbo.img
+          fi
+          
+          echo "AnyKernel3 prepared with kernel files"
+          ls -la
+
+      - name: 📝 Update AnyKernel3 props
+        run: |
+          cd ${{ github.workspace }}/AnyKernel3
+          
+          # Update properties
+          sed -i "s/is_slot_device=.*/is_slot_device=auto/" anykernel.sh
+          sed -i "s/is_super_device=.*/is_super_device=auto/" anykernel.sh
+          sed -i "s/magisk_size_check=.*/magisk_size_check=false/" anykernel.sh
+          sed -i "s/magisk_slot_compat=.*/magisk_slot_compat=true/" anykernel.sh
+
+      - name: 📦 Create flashable zip
+        run: |
+          cd ${{ github.workspace }}/AnyKernel3
+          
+          # Get kernel version
+          KERNEL_VERSION=$(cat ${{ github.workspace }}/device_kernel/include/config/kernel.release 2>/dev/null || echo "unknown")
+          BUILD_DATE=$(date +%Y%m%d_%H%M%S)
+          
+          # Create zip file
+          ZIP_NAME="${{ env.DEVICE_NAME }}-kernel-${KERNEL_VERSION}-${BUILD_DATE}.zip"
+          echo "Creating flashable kernel: $ZIP_NAME"
+          
+          zip -r9 "$ZIP_NAME" * -x ".git/*"
+          
+          # Verify zip was created
+          if [ -f "$ZIP_NAME" ]; then
+              ls -lh "$ZIP_NAME"
+              echo "KERNEL_ZIP=$ZIP_NAME" >> $GITHUB_ENV
+              echo "KERNEL_VERSION=$KERNEL_VERSION" >> $GITHUB_ENV
+          else
+              echo "Failed to create flashable zip"
+              exit 1
+          fi
+
+      - name: 📊 Generate build information
+        run: |
+          cat > ${{ github.workspace }}/BUILD_INFO.txt << EOF
+          ============================================
+          William24hmar's Nothing Kernel Build Report
+          ============================================
+          
+          Build Date: $(date)
+          Build System: GitHub Actions
+          
+          Device: ${{ env.DEVICE_NAME }}
+          Device Codename: ${{ env.DEVICE_CODENAME }}
+          
+          Kernel Source: ${{ env.KERNEL_SOURCE }}
+          Kernel Branch: ${{ env.KERNEL_BRANCH }}
+          
+          Toolchain:
+          - CLANG: $(cat ${{ github.workspace }}/toolchain/clang/bin/clang --version | head -1)
+          - GCC 64-bit: Installed
+          - GCC 32-bit: Installed
+          
+          Build Status: SUCCESS ✓
+          
+          Kernel Image: arch/arm64/boot/Image
+          Modules: $(find ${{ github.workspace }}/device_kernel -name "*.ko" | wc -l)
+          
+          Flashable Package: ${{ env.KERNEL_ZIP }}
+          
+          ============================================
+          EOF
+          
+          cat BUILD_INFO.txt
+
+      - name: 📤 Upload Kernel Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-image
+          path: |
+            ${{ github.workspace }}/device_kernel/arch/arm64/boot/Image
+            ${{ github.workspace }}/device_kernel/arch/arm64/boot/dts/**/*.dtb
+          retention-days: 7
+
+      - name: 📤 Upload Flashable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: flashable-kernel-zip
+          path: ${{ github.workspace }}/AnyKernel3/${{ env.KERNEL_ZIP }}
+          retention-days: 30
+
+      - name: 📤 Upload Build Info
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-information
+          path: ${{ github.workspace }}/BUILD_INFO.txt
+          retention-days: 7
+
+      - name: 📝 Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            ${{ github.workspace }}/AnyKernel3/${{ env.KERNEL_ZIP }}
+            ${{ github.workspace }}/BUILD_INFO.txt
+            ${{ github.workspace }}/device_kernel/arch/arm64/boot/Image
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ✅ Build Summary
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "Build Summary"
+          echo "=========================================="
+          echo "Status: SUCCESS"
+          echo "Device: ${{ env.DEVICE_NAME }}"
+          echo "Kernel Branch: ${{ env.KERNEL_BRANCH }}"
+          echo "Build Date: $(date)"
+          echo "=========================================="
