@@ -22,6 +22,7 @@ env:
   # Device configuration
   DEVICE_NAME: "nothing_phone_1"
   DEVICE_CODENAME: "spacewar"
+  KERNEL_ARCH: "arm64"
   
   # Build configuration
   CUSTOM_CMDS: "CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu-"

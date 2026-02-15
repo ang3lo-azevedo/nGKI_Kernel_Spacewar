@@ -25,6 +25,7 @@ env:
   # Device configuration
   DEVICE_NAME: "nothing_phone_1"
   DEVICE_CODENAME: "spacewar"
+  KERNEL_ARCH: "arm64"
   
   # Build configuration
   CUSTOM_CMDS: "CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu-"
@@ -199,6 +200,7 @@ jobs:
           # Set up environment
           export PATH="${{ github.workspace }}/toolchain/clang/bin:$PATH"
           export LD_LIBRARY_PATH="${{ github.workspace }}/toolchain/clang/lib64:$LD_LIBRARY_PATH"
+          export ARCH="${{ env.KERNEL_ARCH }}"
           
           # Load defconfig
           if [ -n "${{ env.DEFCONFIG_NAME }}" ]; then
