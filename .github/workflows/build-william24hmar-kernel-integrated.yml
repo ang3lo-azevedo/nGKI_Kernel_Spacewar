@@ -114,16 +114,16 @@ jobs:
       CCACHE_HARDLINK: "true"
 
     steps:
-      - name: ⏰ Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: ⌛️ Compilation environment preparation
+      - name: Compilation environment preparation
         uses: ./.github/workflows/build-env
 
-      - name: ⚙️ Get necessary tools
+      - name: Get necessary tools
         uses: ./.github/workflows/build-ready
 
-      - name: 📥 Clone kernel source
+      - name: Clone kernel source
         run: |
           echo "Cloning kernel source from: ${{ env.KERNEL_SOURCE }}"
           git clone --depth=1 -b ${{ env.KERNEL_BRANCH }} ${{ env.KERNEL_SOURCE }} device_kernel || \
@@ -133,35 +133,35 @@ jobs:
           echo "Kernel branch: $(git rev-parse --abbrev-ref HEAD)"
           echo "Kernel commit: $(git rev-parse --short HEAD)"
 
-      - name: 🪝 Patch Kernel of SUSFS
+      - name: Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
         if: env.SUSFS_ENABLE == 'true'
 
-      - name: 🔗 Patch for no-kprobe
+      - name: Patch for no-kprobe
         uses: ./.github/workflows/patch-no-kprobe
 
-      - name: 🧰 Patch Kernel of Re:Kernel
+      - name: Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
         if: env.REKERNEL_ENABLE == 'true'
 
-      - name: 🔒 Patch Kernel of Baseband Guard
+      - name: Patch Kernel of Baseband Guard
         uses: ./.github/workflows/patch-baseband-guard
         if: env.BASEBAND_GUARD_ENABLE == 'true'
 
-      - name: 🔧 Patch Hide Stuff
+      - name: Patch Hide Stuff
         uses: ./.github/workflows/patch-hide-stuff
         if: env.HIDE_STUFF == 'true'
 
-      - name: 🚀 Build Process
+      - name: Build Process
         uses: ./.github/workflows/build-process
 
-      - name: 🔩 Pack Process
+      - name: Pack Process
         uses: ./.github/workflows/pack-process
 
-      - name: ✏️ Upload Artifacts
+      - name: Upload Artifacts
         uses: ./.github/workflows/upload-files
 
-      - name: ✅ Build Complete
+      - name: Build Complete
         run: |
           echo "=========================================="
           echo "Build Complete!"

@@ -117,7 +117,7 @@ jobs:
       CCACHE_HARDLINK: "true"
 
     steps:
-      - name: ⏰ Checkout this repository
+      - name: Checkout this repository
         uses: actions/checkout@v4
         with:
           path: build-system
@@ -135,7 +135,7 @@ jobs:
           echo "=== Kernel Source ==="
           ls -la device_kernel/
 
-      - name: 🔧 Install build dependencies
+      - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -155,7 +155,7 @@ jobs:
               zip \
               unzip
 
-      - name: ⬇️ Download CLANG toolchain
+      - name: Download CLANG toolchain
         run: |
           mkdir -p ${{ github.workspace }}/toolchain/clang
           cd ${{ github.workspace }}/toolchain/clang
@@ -168,7 +168,7 @@ jobs:
           # Verify CLANG installation
           ./bin/clang --version
 
-      - name: ⬇️ Download GCC 64-bit toolchain
+      - name: Download GCC 64-bit toolchain
         run: |
           mkdir -p ${{ github.workspace }}/toolchain/gcc-64
           cd ${{ github.workspace }}/toolchain/gcc-64
@@ -176,7 +176,7 @@ jobs:
           echo "Downloading GCC 64-bit toolchain..."
           git clone --depth=1 -b ${{ env.GCC_64_BRANCH }} ${{ env.GCC_64_SOURCE }} .
 
-      - name: ⬇️ Download GCC 32-bit toolchain
+      - name: Download GCC 32-bit toolchain
         run: |
           mkdir -p ${{ github.workspace }}/toolchain/gcc-32
           cd ${{ github.workspace }}/toolchain/gcc-32
@@ -184,7 +184,7 @@ jobs:
           echo "Downloading GCC 32-bit toolchain..."
           git clone --depth=1 -b ${{ env.GCC_32_BRANCH }} ${{ env.GCC_32_SOURCE }} .
 
-      - name: 🔍 Verify toolchain installation
+      - name: Verify toolchain installation
         run: |
           echo "CLANG version:"
           ${{ github.workspace }}/toolchain/clang/bin/clang --version
@@ -192,7 +192,7 @@ jobs:
           echo "GCC 64-bit version:"
           ${{ github.workspace }}/toolchain/gcc-64/bin/aarch64-linux-android-gcc --version || true
 
-      - name: ⚙️ Configure kernel
+      - name: Configure kernel
         run: |
           cd ${{ github.workspace }}/device_kernel
           
@@ -209,7 +209,7 @@ jobs:
               make ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} defconfig
           fi
 
-      - name: 🚀 Build kernel
+      - name: Build kernel
         run: |
           cd ${{ github.workspace }}/device_kernel
           
@@ -232,13 +232,13 @@ jobs:
           
           # Check if Image exists
           if [ -f arch/arm64/boot/Image ]; then
-              echo "✓ Kernel Image built successfully"
+              echo "Kernel Image built successfully"
           else
-              echo "✗ Failed to build kernel Image"
+              echo "Failed to build kernel Image"
               exit 1
           fi
 
-      - name: 🔨 Build dtb (Device Tree Blob)
+      - name: Build dtb (Device Tree Blob)
         run: |
           cd ${{ github.workspace }}/device_kernel
           
@@ -251,7 +251,7 @@ jobs:
               make ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} dtbs -j$(nproc)
           fi
 
-      - name: 📦 Download AnyKernel3
+      - name: Download AnyKernel3
         run: |
           mkdir -p ${{ github.workspace }}/AnyKernel3
           cd ${{ github.workspace }}/AnyKernel3
@@ -259,7 +259,7 @@ jobs:
           echo "Cloning AnyKernel3..."
           git clone --depth=1 -b master ${{ env.AK3_SOURCE }} .
 
-      - name: 🔧 Prepare AnyKernel3
+      - name: Prepare AnyKernel3
         run: |
           cd ${{ github.workspace }}/AnyKernel3
           
@@ -281,7 +281,7 @@ jobs:
           echo "AnyKernel3 prepared with kernel files"
           ls -la
 
-      - name: 📝 Update AnyKernel3 props
+      - name: Update AnyKernel3 props
         run: |
           cd ${{ github.workspace }}/AnyKernel3
           
@@ -291,7 +291,7 @@ jobs:
           sed -i "s/magisk_size_check=.*/magisk_size_check=false/" anykernel.sh
           sed -i "s/magisk_slot_compat=.*/magisk_slot_compat=true/" anykernel.sh
 
-      - name: 📦 Create flashable zip
+      - name: Create flashable zip
         run: |
           cd ${{ github.workspace }}/AnyKernel3
           
@@ -315,7 +315,7 @@ jobs:
               exit 1
           fi
 
-      - name: 📊 Generate build information
+      - name: Generate build information
         run: |
           cat > ${{ github.workspace }}/BUILD_INFO.txt << EOF
           ============================================
@@ -336,7 +336,7 @@ jobs:
           - GCC 64-bit: Installed
           - GCC 32-bit: Installed
           
-          Build Status: SUCCESS ✓
+          Build Status: SUCCESS
           
           Kernel Image: arch/arm64/boot/Image
           Modules: $(find ${{ github.workspace }}/device_kernel -name "*.ko" | wc -l)
@@ -348,7 +348,7 @@ jobs:
           
           cat BUILD_INFO.txt
 
-      - name: 📤 Upload Kernel Image
+      - name: Upload Kernel Image
         uses: actions/upload-artifact@v4
         with:
           name: kernel-image
@@ -357,21 +357,21 @@ jobs:
             ${{ github.workspace }}/device_kernel/arch/arm64/boot/dts/**/*.dtb
           retention-days: 7
 
-      - name: 📤 Upload Flashable ZIP
+      - name: Upload Flashable ZIP
         uses: actions/upload-artifact@v4
         with:
           name: flashable-kernel-zip
           path: ${{ github.workspace }}/AnyKernel3/${{ env.KERNEL_ZIP }}
           retention-days: 30
 
-      - name: 📤 Upload Build Info
+      - name: Upload Build Info
         uses: actions/upload-artifact@v4
         with:
           name: build-information
           path: ${{ github.workspace }}/BUILD_INFO.txt
           retention-days: 7
 
-      - name: 📝 Create Release
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
@@ -382,7 +382,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: ✅ Build Summary
+      - name: Build Summary
         if: always()
         run: |
           echo "=========================================="
